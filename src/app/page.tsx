@@ -156,6 +156,20 @@ export default function Home() {
     return { income, expense, net: income - expense };
   }, [txs, baseCurrency, usdUyuRate]);
 
+  const recurringProjection = useMemo(() => {
+    const recurringIncome = recurrings
+      .filter((r) => r.active && r.kind === "income")
+      .reduce((acc, r) => acc + toBase(r.amount, r.currency, baseCurrency), 0);
+    const recurringExpense = recurrings
+      .filter((r) => r.active && r.kind === "expense")
+      .reduce((acc, r) => acc + toBase(r.amount, r.currency, baseCurrency), 0);
+    return {
+      recurringIncome,
+      recurringExpense,
+      projectedNet: recurringIncome - recurringExpense,
+    };
+  }, [recurrings, baseCurrency, usdUyuRate]);
+
   const spendByCategory = useMemo(() => {
     const map: Record<string, number> = {};
     for (const tx of txs.filter((t) => t.kind === "expense")) {
@@ -268,6 +282,17 @@ export default function Home() {
     setNewGoal({ title: "", type: "income", target: "", currency: "USD", deadline: "" });
   };
 
+  const exportBackup = () => {
+    const payload = { categories, accounts, txs, budgets, recurrings, goals, baseCurrency, usdUyuRate };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lume-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const goalProgress = (g: FinancialGoal) => {
     const currentBase = g.type === "income" ? totals.income : Math.max(totals.net, 0);
     const currentInGoalCurrency = g.currency === baseCurrency ? currentBase : toBase(currentBase, baseCurrency, g.currency);
@@ -287,6 +312,7 @@ export default function Home() {
           <p className="text-xs uppercase tracking-[0.24em] text-zinc-400">Lume</p>
           <h1 className="mt-2 text-3xl font-bold">Control de Finanzas Personal</h1>
           <p className="mt-2 text-sm text-zinc-400">Multi-moneda + presupuestos + recurring transactions + metas financieras.</p>
+          <button className="btn mt-3 max-w-xs" onClick={exportBackup}>Exportar backup JSON</button>
         </header>
 
         <section className="mb-4 grid gap-4 md:grid-cols-3">
@@ -308,6 +334,12 @@ export default function Home() {
           <Kpi title={`Balance Neto (${baseCurrency})`} value={totals.net} highlight />
           <Kpi title="Categorías con presupuesto" value={budgets.length} />
           <Kpi title="Recurrings activos" value={recurrings.filter((r) => r.active).length} />
+        </section>
+
+        <section className="mt-4 grid gap-4 md:grid-cols-3">
+          <Kpi title={`Proyección ingresos fijos (${baseCurrency})`} value={recurringProjection.recurringIncome} />
+          <Kpi title={`Proyección gastos fijos (${baseCurrency})`} value={recurringProjection.recurringExpense} />
+          <Kpi title={`Proyección neta mensual (${baseCurrency})`} value={recurringProjection.projectedNet} highlight={recurringProjection.projectedNet >= 0} />
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-3">
