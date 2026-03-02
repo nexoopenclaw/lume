@@ -41,6 +41,19 @@ type FinancialGoal = {
   deadline: string;
 };
 
+type ReconciliationState = {
+  expectedBalance: string;
+  realBalance: string;
+  reconciledAt?: string;
+};
+
+type SmartAlert = {
+  id: string;
+  title: string;
+  description: string;
+  severity: "info" | "warn" | "critical";
+};
+
 type TxDraft = {
   accountId: string;
   categoryId: string;
@@ -52,7 +65,7 @@ type TxDraft = {
 };
 
 const BRAND = "#d4e83a";
-const STORAGE_KEY = "lume-v6";
+const STORAGE_KEY = "lume-v7";
 
 const seedCategories: Category[] = [
   { id: "c-food", name: "Comida", kind: "expense" },
@@ -122,6 +135,7 @@ export default function Home() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [recurrings, setRecurrings] = useState<RecurringTx[]>([]);
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
+  const [reconciliations, setReconciliations] = useState<Record<string, ReconciliationState>>({});
 
   const [cloudEmail, setCloudEmail] = useState("");
   const [cloudUserId, setCloudUserId] = useState<string | null>(null);
@@ -167,7 +181,7 @@ export default function Home() {
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [editingTx, setEditingTx] = useState<TxDraft | null>(null);
 
-  const getPayload = () => ({ categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals });
+  const getPayload = () => ({ categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals, reconciliations });
 
   const connectCloud = async () => {
     if (!supabase) {
@@ -217,6 +231,7 @@ export default function Home() {
     if (s.budgets) setBudgets(s.budgets as Budget[]);
     if (s.recurrings) setRecurrings(s.recurrings as RecurringTx[]);
     if (s.goals) setGoals(s.goals as FinancialGoal[]);
+    if (s.reconciliations) setReconciliations(s.reconciliations as Record<string, ReconciliationState>);
 
     setCloudStatus("Cloud: datos cargados ✅");
   };
@@ -234,6 +249,7 @@ export default function Home() {
       if (parsed.budgets) setBudgets(parsed.budgets);
       if (parsed.recurrings) setRecurrings(parsed.recurrings);
       if (parsed.goals) setGoals(parsed.goals);
+      if (parsed.reconciliations) setReconciliations(parsed.reconciliations);
     } catch {
       // noop
     }
@@ -266,9 +282,9 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals }),
+      JSON.stringify({ categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals, reconciliations }),
     );
-  }, [categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals]);
+  }, [categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals, reconciliations]);
 
   const rate = Number(usdUyuRate) || 39.5;
   const toBase = (amount: number, currency: string, base: BaseCurrency) => {
@@ -508,7 +524,7 @@ export default function Home() {
   };
 
   const exportBackup = () => {
-    const payload = { categories, accounts, txs, budgets, recurrings, goals, baseCurrency, usdUyuRate };
+    const payload = { categories, accounts, txs, budgets, recurrings, goals, reconciliations, baseCurrency, usdUyuRate };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -532,6 +548,7 @@ export default function Home() {
         if (Array.isArray(parsed.budgets)) setBudgets(parsed.budgets);
         if (Array.isArray(parsed.recurrings)) setRecurrings(parsed.recurrings);
         if (Array.isArray(parsed.goals)) setGoals(parsed.goals);
+        if (parsed.reconciliations) setReconciliations(parsed.reconciliations);
         if (parsed.baseCurrency === "USD" || parsed.baseCurrency === "UYU") setBaseCurrency(parsed.baseCurrency);
         if (parsed.usdUyuRate) setUsdUyuRate(String(parsed.usdUyuRate));
       } catch {
@@ -605,6 +622,35 @@ export default function Home() {
     if (editingTxId === txId) cancelEditTx();
   };
 
+
+
+  const updateReconciliation = (
+    accountId: string,
+    field: "expectedBalance" | "realBalance",
+    value: string,
+  ) => {
+    setReconciliations((prev) => ({
+      ...prev,
+      [accountId]: {
+        expectedBalance: prev[accountId]?.expectedBalance ?? String(accountMap[accountId]?.balance ?? 0),
+        realBalance: prev[accountId]?.realBalance ?? "",
+        reconciledAt: prev[accountId]?.reconciledAt,
+        [field]: value,
+      },
+    }));
+  };
+
+  const markAccountReconciled = (accountId: string) => {
+    setReconciliations((prev) => ({
+      ...prev,
+      [accountId]: {
+        expectedBalance: prev[accountId]?.expectedBalance ?? String(accountMap[accountId]?.balance ?? 0),
+        realBalance: prev[accountId]?.realBalance ?? "",
+        reconciledAt: new Date().toISOString(),
+      },
+    }));
+  };
+
   const goalProgress = (g: FinancialGoal) => {
     const currentBase = g.type === "income" ? totals.income : Math.max(totals.net, 0);
     const currentInGoalCurrency = g.currency === baseCurrency ? currentBase : toBase(currentBase, baseCurrency, g.currency);
@@ -622,6 +668,61 @@ export default function Home() {
 
   const categoryMap = Object.fromEntries(categories.map((c) => [c.id, c]));
   const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a]));
+
+
+
+  const smartAlerts = useMemo<SmartAlert[]>(() => {
+    const alerts: SmartAlert[] = [];
+
+    overBudgetItems.forEach((item) => {
+      const ratio = item.limitBase > 0 ? item.excess / item.limitBase : 0;
+      alerts.push({
+        id: `ob-${item.categoryId}`,
+        title: `Sobre presupuesto: ${categoryMap[item.categoryId]?.name ?? "Categoría"}`,
+        description: `Exceso de ${fmt(item.excess)} ${baseCurrency} sobre el límite mensual.`,
+        severity: ratio >= 0.2 ? "critical" : "warn",
+      });
+    });
+
+    if (advancedDashboard.trendPct >= 15) {
+      alerts.push({
+        id: "trend-up",
+        title: "Aumento de gasto mensual",
+        description: `El gasto del mes actual subió ${fmt(advancedDashboard.trendPct, 1)}% vs ${monthLabel(monthPrev)}.`,
+        severity: advancedDashboard.trendPct >= 35 ? "critical" : "warn",
+      });
+    }
+
+    const lowBalanceThreshold = baseCurrency === "USD" ? 300 : 12000;
+    if (accountBalances.selected <= lowBalanceThreshold) {
+      alerts.push({
+        id: "low-balance",
+        title: "Balance neto bajo",
+        description: `Tus cuentas están en ${fmt(accountBalances.selected)} ${baseCurrency}. Umbral: ${fmt(lowBalanceThreshold)} ${baseCurrency}.`,
+        severity: accountBalances.selected <= lowBalanceThreshold * 0.6 ? "critical" : "warn",
+      });
+    }
+
+    const now = new Date();
+    const upcomingExpenses = recurrings.filter((r) => {
+      if (!r.active || r.kind !== "expense") return false;
+      const due = new Date(now.getFullYear(), now.getMonth(), Math.min(r.dayOfMonth, 28));
+      const diffDays = (due.getTime() - now.getTime()) / 86400000;
+      return diffDays >= 0 && diffDays <= 7;
+    });
+
+    upcomingExpenses.forEach((r) => {
+      const amountBase = toBase(r.amount, r.currency, baseCurrency);
+      alerts.push({
+        id: `rec-${r.id}`,
+        title: "Gasto recurrente próximo",
+        description: `${r.note || categoryMap[r.categoryId]?.name || "Sin nota"} vence en <=7 días por ${fmt(amountBase)} ${baseCurrency}.`,
+        severity: amountBase >= (baseCurrency === "USD" ? 150 : 6000) ? "warn" : "info",
+      });
+    });
+
+    return alerts.slice(0, 8);
+  }, [overBudgetItems, categoryMap, baseCurrency, advancedDashboard.trendPct, monthPrev, accountBalances.selected, recurrings, usdUyuRate]);
 
   const filteredTxs = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -870,6 +971,52 @@ export default function Home() {
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
+          <Card title="Conciliación de cuentas">
+            <div className="space-y-2">
+              {accounts.map((a) => {
+                const row = reconciliations[a.id] ?? { expectedBalance: String(a.balance), realBalance: "" };
+                const expected = Number(row.expectedBalance || 0);
+                const real = Number(row.realBalance || 0);
+                const diff = real - expected;
+                const ok = Math.abs(diff) < 0.01;
+                return (
+                  <div key={a.id} className="item block">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">{a.name} ({a.currency})</p>
+                      <span className={`badge ${ok ? "badge-ok" : "badge-risk"}`}>{ok ? "ok" : "descuadre"}</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <input className="field" type="number" value={row.expectedBalance} onChange={(e) => updateReconciliation(a.id, "expectedBalance", e.target.value)} placeholder="Saldo esperado" />
+                      <input className="field" type="number" value={row.realBalance} onChange={(e) => updateReconciliation(a.id, "realBalance", e.target.value)} placeholder="Saldo real" />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-zinc-300">Diferencia: <b className={ok ? "text-green-300" : "text-rose-300"}>{fmt(diff)} {a.currency}</b></span>
+                      <button className="btn btn-small" onClick={() => markAccountReconciled(a.id)}>Marcar conciliada</button>
+                    </div>
+                    {row.reconciledAt ? <p className="mt-2 text-xs text-zinc-400">Última conciliación: {new Date(row.reconciledAt).toLocaleString("es-UY")}</p> : null}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card title="Alertas inteligentes">
+            <div className="space-y-2">
+              {smartAlerts.map((alert) => (
+                <div key={alert.id} className="item block">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{alert.title}</p>
+                    <span className={`badge ${alert.severity === "critical" ? "badge-critical" : alert.severity === "warn" ? "badge-risk" : "badge-info"}`}>{alert.severity}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-zinc-300">{alert.description}</p>
+                </div>
+              ))}
+              {!smartAlerts.length ? <p className="text-sm text-zinc-400">Sin alertas por ahora. Todo bajo control.</p> : null}
+            </div>
+          </Card>
+        </section>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <Card title="Recurring Transactions">
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2"><select className="field" value={newRecurring.kind} onChange={(e) => setNewRecurring((s) => ({ ...s, kind: e.target.value as Kind }))}><option value="expense">Consumo</option><option value="income">Ingreso</option></select><input className="field" type="number" placeholder="Día del mes (1-31)" value={newRecurring.dayOfMonth} onChange={(e) => setNewRecurring((s) => ({ ...s, dayOfMonth: e.target.value }))} /></div>
@@ -945,6 +1092,8 @@ export default function Home() {
         .badge { border: 1px solid rgba(212,232,58,0.45); background: rgba(212,232,58,0.12); color: ${BRAND}; padding: 2px 8px; border-radius: 999px; font-size: 11px; text-transform: uppercase; }
         .badge-ok { border-color: rgba(52,211,153,0.4); color: #6ee7b7; background: rgba(16,185,129,0.12); }
         .badge-risk { border-color: rgba(251,113,133,0.45); color: #fda4af; background: rgba(244,63,94,0.12); }
+        .badge-info { border-color: rgba(125,211,252,0.4); color: #bae6fd; background: rgba(14,165,233,0.12); }
+        .badge-critical { border-color: rgba(239,68,68,0.6); color: #fecaca; background: rgba(220,38,38,0.2); }
       `}</style>
     </main>
   );
