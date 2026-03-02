@@ -40,16 +40,17 @@ const seedCategories: Category[] = [
 ];
 
 const seedAccounts: Account[] = [
-  { id: "a-mi-usd", name: "Mi Dinero USD", currency: "USD", balance: 1200 },
+  { id: "a-brou", name: "BROU", currency: "UYU", balance: 0 },
+  { id: "a-mi-usd", name: "Mi Dinero USD", currency: "USD", balance: 0 },
   { id: "a-mi-uyu", name: "Mi Dinero Pesos", currency: "UYU", balance: 0 },
   { id: "a-redots", name: "RedotPay", currency: "USDT", balance: 0 },
-  { id: "a-vinas", name: "Viñas", currency: "USD", balance: 1200 },
+  { id: "a-binance", name: "Binance", currency: "USD", balance: 1200 },
 ];
 
 const seedTxs: Tx[] = [
   {
-    id: "t-seed-vinas-1200",
-    accountId: "a-vinas",
+    id: "t-seed-binance-1200",
+    accountId: "a-binance",
     categoryId: "c-client",
     kind: "income",
     amount: 1200,
@@ -79,7 +80,7 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const raw = localStorage.getItem("lume-v1");
+    const raw = localStorage.getItem("lume-v2");
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw);
@@ -90,7 +91,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("lume-v1", JSON.stringify({ categories, accounts, txs }));
+    localStorage.setItem("lume-v2", JSON.stringify({ categories, accounts, txs }));
   }, [categories, accounts, txs]);
 
   const totals = useMemo(() => {
