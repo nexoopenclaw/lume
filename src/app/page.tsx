@@ -51,7 +51,7 @@ type TxDraft = {
 };
 
 const BRAND = "#d4e83a";
-const STORAGE_KEY = "lume-v5";
+const STORAGE_KEY = "lume-v6";
 
 const seedCategories: Category[] = [
   { id: "c-food", name: "Comida", kind: "expense" },
@@ -60,25 +60,36 @@ const seedCategories: Category[] = [
   { id: "c-vet", name: "Veterinaria", kind: "expense" },
   { id: "c-client", name: "Clientes", kind: "income" },
   { id: "c-aff", name: "Afiliados", kind: "income" },
+  { id: "c-transfer", name: "Transferencias", kind: "both" },
 ];
 
 const seedAccounts: Account[] = [
   { id: "a-brou", name: "BROU", currency: "UYU", balance: 0 },
-  { id: "a-mi-usd", name: "Mi Dinero USD", currency: "USD", balance: 0 },
+  { id: "a-mi-usd", name: "Mi Dinero USD", currency: "USD", balance: 201.31 },
   { id: "a-mi-uyu", name: "Mi Dinero Pesos", currency: "UYU", balance: 0 },
   { id: "a-redots", name: "RedotPay", currency: "USDT", balance: 0 },
-  { id: "a-binance", name: "Binance", currency: "USD", balance: 1200 },
+  { id: "a-binance", name: "Binance", currency: "USDT", balance: 905.5 },
 ];
 
 const seedTxs: Tx[] = [
   {
-    id: "t-seed-binance-1200",
+    id: "t-seed-exchange-out",
     accountId: "a-binance",
-    categoryId: "c-client",
+    categoryId: "c-transfer",
+    kind: "expense",
+    amount: 200,
+    currency: "USDT",
+    note: "Cambio de Binance a Mi Dinero USD",
+    date: new Date().toISOString().slice(0, 10),
+  },
+  {
+    id: "t-seed-exchange-in",
+    accountId: "a-mi-usd",
+    categoryId: "c-transfer",
     kind: "income",
-    amount: 1200,
+    amount: 201.31,
     currency: "USD",
-    note: "Consultoría cerrada hoy",
+    note: "Entrada por cambio desde Binance",
     date: new Date().toISOString().slice(0, 10),
   },
 ];
