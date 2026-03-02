@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type Kind = "expense" | "income";
 type BaseCurrency = "USD" | "UYU";
+type GoalType = "income" | "savings";
 
 type Category = { id: string; name: string; kind: Kind | "both" };
 type Account = { id: string; name: string; currency: string; balance: number };
@@ -18,6 +19,26 @@ type Tx = {
   date: string;
 };
 type Budget = { categoryId: string; limit: number; currency: BaseCurrency };
+type RecurringTx = {
+  id: string;
+  accountId: string;
+  categoryId: string;
+  kind: Kind;
+  amount: number;
+  currency: string;
+  dayOfMonth: number;
+  note: string;
+  active: boolean;
+  lastAppliedMonth?: string;
+};
+type FinancialGoal = {
+  id: string;
+  title: string;
+  type: GoalType;
+  target: number;
+  currency: BaseCurrency;
+  deadline: string;
+};
 
 const BRAND = "#d4e83a";
 
@@ -60,6 +81,8 @@ export default function Home() {
   const [baseCurrency, setBaseCurrency] = useState<BaseCurrency>("USD");
   const [usdUyuRate, setUsdUyuRate] = useState<string>("39.5");
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [recurrings, setRecurrings] = useState<RecurringTx[]>([]);
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
 
   const [newCat, setNewCat] = useState({ name: "", kind: "expense" as Category["kind"] });
   const [newAccount, setNewAccount] = useState({ name: "", currency: "USD", balance: "0" });
@@ -73,9 +96,25 @@ export default function Home() {
     date: new Date().toISOString().slice(0, 10),
   });
   const [newBudget, setNewBudget] = useState({ categoryId: "", limit: "", currency: "USD" as BaseCurrency });
+  const [newRecurring, setNewRecurring] = useState({
+    accountId: "",
+    categoryId: "",
+    kind: "expense" as Kind,
+    amount: "",
+    currency: "USD",
+    dayOfMonth: "1",
+    note: "",
+  });
+  const [newGoal, setNewGoal] = useState({
+    title: "",
+    type: "income" as GoalType,
+    target: "",
+    currency: "USD" as BaseCurrency,
+    deadline: "",
+  });
 
   useEffect(() => {
-    const raw = localStorage.getItem("lume-v3");
+    const raw = localStorage.getItem("lume-v4");
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw);
@@ -85,15 +124,17 @@ export default function Home() {
       if (parsed.baseCurrency) setBaseCurrency(parsed.baseCurrency);
       if (parsed.usdUyuRate) setUsdUyuRate(parsed.usdUyuRate);
       if (parsed.budgets) setBudgets(parsed.budgets);
+      if (parsed.recurrings) setRecurrings(parsed.recurrings);
+      if (parsed.goals) setGoals(parsed.goals);
     } catch {}
   }, []);
 
   useEffect(() => {
     localStorage.setItem(
-      "lume-v3",
-      JSON.stringify({ categories, accounts, txs, baseCurrency, usdUyuRate, budgets }),
+      "lume-v4",
+      JSON.stringify({ categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals }),
     );
-  }, [categories, accounts, txs, baseCurrency, usdUyuRate, budgets]);
+  }, [categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals]);
 
   const rate = Number(usdUyuRate) || 39.5;
   const toBase = (amount: number, currency: string, base: BaseCurrency) => {
@@ -160,6 +201,82 @@ export default function Home() {
     setNewBudget({ categoryId: "", limit: "", currency: "USD" });
   };
 
+  const addRecurring = () => {
+    if (!newRecurring.accountId || !newRecurring.categoryId || !newRecurring.amount) return;
+    const amount = Number(newRecurring.amount);
+    const dayOfMonth = Number(newRecurring.dayOfMonth);
+    if (Number.isNaN(amount) || amount <= 0 || Number.isNaN(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) return;
+    const item: RecurringTx = {
+      id: `r-${uid()}`,
+      accountId: newRecurring.accountId,
+      categoryId: newRecurring.categoryId,
+      kind: newRecurring.kind,
+      amount,
+      currency: newRecurring.currency.toUpperCase(),
+      dayOfMonth,
+      note: newRecurring.note,
+      active: true,
+    };
+    setRecurrings((prev) => [item, ...prev]);
+    setNewRecurring({ accountId: "", categoryId: "", kind: "expense", amount: "", currency: "USD", dayOfMonth: "1", note: "" });
+  };
+
+  const applyRecurringThisMonth = () => {
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const toApply = recurrings.filter((r) => r.active && r.lastAppliedMonth !== monthKey);
+    if (!toApply.length) return;
+
+    const generated: Tx[] = toApply.map((r) => ({
+      id: `t-${uid()}`,
+      accountId: r.accountId,
+      categoryId: r.categoryId,
+      kind: r.kind,
+      amount: r.amount,
+      currency: r.currency,
+      note: r.note || "Recurring",
+      date: `${monthKey}-${String(Math.min(r.dayOfMonth, 28)).padStart(2, "0")}`,
+    }));
+
+    setTxs((prev) => [...generated, ...prev]);
+    setAccounts((prev) =>
+      prev.map((a) => {
+        const related = generated.filter((g) => g.accountId === a.id);
+        if (!related.length) return a;
+        const delta = related.reduce((acc, g) => acc + (g.kind === "income" ? g.amount : -g.amount), 0);
+        return { ...a, balance: a.balance + delta };
+      }),
+    );
+    setRecurrings((prev) => prev.map((r) => (toApply.some((x) => x.id === r.id) ? { ...r, lastAppliedMonth: monthKey } : r)));
+  };
+
+  const addGoal = () => {
+    if (!newGoal.title.trim() || !newGoal.target || !newGoal.deadline) return;
+    const target = Number(newGoal.target);
+    if (Number.isNaN(target) || target <= 0) return;
+    setGoals((prev) => [
+      ...prev,
+      {
+        id: `g-${uid()}`,
+        title: newGoal.title.trim(),
+        type: newGoal.type,
+        target,
+        currency: newGoal.currency,
+        deadline: newGoal.deadline,
+      },
+    ]);
+    setNewGoal({ title: "", type: "income", target: "", currency: "USD", deadline: "" });
+  };
+
+  const goalProgress = (g: FinancialGoal) => {
+    const currentBase = g.type === "income" ? totals.income : Math.max(totals.net, 0);
+    const currentInGoalCurrency = g.currency === baseCurrency ? currentBase : toBase(currentBase, baseCurrency, g.currency);
+    return {
+      current: currentInGoalCurrency,
+      pct: Math.min((currentInGoalCurrency / g.target) * 100, 100),
+    };
+  };
+
   const categoryMap = Object.fromEntries(categories.map((c) => [c.id, c]));
   const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a]));
 
@@ -169,7 +286,7 @@ export default function Home() {
         <header className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-6">
           <p className="text-xs uppercase tracking-[0.24em] text-zinc-400">Lume</p>
           <h1 className="mt-2 text-3xl font-bold">Control de Finanzas Personal</h1>
-          <p className="mt-2 text-sm text-zinc-400">Multi-moneda + presupuestos por categoría (MVP).</p>
+          <p className="mt-2 text-sm text-zinc-400">Multi-moneda + presupuestos + recurring transactions + metas financieras.</p>
         </header>
 
         <section className="mb-4 grid gap-4 md:grid-cols-3">
@@ -190,7 +307,7 @@ export default function Home() {
         <section className="grid gap-4 md:grid-cols-3">
           <Kpi title={`Balance Neto (${baseCurrency})`} value={totals.net} highlight />
           <Kpi title="Categorías con presupuesto" value={budgets.length} />
-          <Kpi title="Cuentas" value={accounts.length} />
+          <Kpi title="Recurrings activos" value={recurrings.filter((r) => r.active).length} />
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -218,37 +335,73 @@ export default function Home() {
             <div className="space-y-2">
               <div className="grid grid-cols-3 gap-2"><input className="field col-span-2" placeholder="Nombre categoría" value={newCat.name} onChange={(e) => setNewCat((s) => ({ ...s, name: e.target.value }))} /><select className="field" value={newCat.kind} onChange={(e) => setNewCat((s) => ({ ...s, kind: e.target.value as Category["kind"] }))}><option value="expense">Consumo</option><option value="income">Ingreso</option><option value="both">Ambos</option></select></div>
               <button className="btn" onClick={addCategory}>Agregar categoría</button>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <select className="field" value={newBudget.categoryId} onChange={(e) => setNewBudget((s) => ({ ...s, categoryId: e.target.value }))}>
-                  <option value="">Presupuesto categoría</option>
-                  {categories.filter((c) => c.kind !== "income").map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <input className="field" type="number" placeholder="Límite" value={newBudget.limit} onChange={(e) => setNewBudget((s) => ({ ...s, limit: e.target.value }))} />
-                <select className="field" value={newBudget.currency} onChange={(e) => setNewBudget((s) => ({ ...s, currency: e.target.value as BaseCurrency }))}><option value="USD">USD</option><option value="UYU">UYU</option></select>
-              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2"><select className="field" value={newBudget.categoryId} onChange={(e) => setNewBudget((s) => ({ ...s, categoryId: e.target.value }))}><option value="">Presupuesto categoría</option>{categories.filter((c) => c.kind !== "income").map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><input className="field" type="number" placeholder="Límite" value={newBudget.limit} onChange={(e) => setNewBudget((s) => ({ ...s, limit: e.target.value }))} /><select className="field" value={newBudget.currency} onChange={(e) => setNewBudget((s) => ({ ...s, currency: e.target.value as BaseCurrency }))}><option value="USD">USD</option><option value="UYU">UYU</option></select></div>
               <button className="btn" onClick={addBudget}>Guardar presupuesto</button>
+              <div className="space-y-2 pt-2">{categories.filter((c) => c.kind !== "income").map((c) => { const budget = budgets.find((b) => b.categoryId === c.id); const spent = spendByCategory[c.id] || 0; const limitBase = budget ? toBase(budget.limit, budget.currency, baseCurrency) : 0; const pct = budget && limitBase > 0 ? Math.min((spent / limitBase) * 100, 100) : 0; return (<div key={c.id} className="item block"><div className="flex items-center justify-between"><span>{c.name}</span><span className="badge">{budget ? `${spent.toFixed(0)} / ${limitBase.toFixed(0)} ${baseCurrency}` : "sin presupuesto"}</span></div>{budget ? <div className="mt-2 h-2 rounded bg-white/10"><div className={`h-2 rounded ${pct >= 100 ? "bg-red-500" : "bg-[#d4e83a]"}`} style={{ width: `${pct}%` }} /></div> : null}</div>); })}</div>
+            </div>
+          </Card>
+        </section>
 
-              <div className="space-y-2 pt-2">
-                {categories.filter((c) => c.kind !== "income").map((c) => {
-                  const budget = budgets.find((b) => b.categoryId === c.id);
-                  const spent = spendByCategory[c.id] || 0;
-                  const limitBase = budget ? toBase(budget.limit, budget.currency, baseCurrency) : 0;
-                  const pct = budget && limitBase > 0 ? Math.min((spent / limitBase) * 100, 100) : 0;
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
+          <Card title="Recurring Transactions">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <select className="field" value={newRecurring.kind} onChange={(e) => setNewRecurring((s) => ({ ...s, kind: e.target.value as Kind }))}><option value="expense">Consumo</option><option value="income">Ingreso</option></select>
+                <input className="field" type="number" placeholder="Día del mes (1-31)" value={newRecurring.dayOfMonth} onChange={(e) => setNewRecurring((s) => ({ ...s, dayOfMonth: e.target.value }))} />
+              </div>
+              <select className="field" value={newRecurring.accountId} onChange={(e) => setNewRecurring((s) => ({ ...s, accountId: e.target.value }))}><option value="">Cuenta</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+              <select className="field" value={newRecurring.categoryId} onChange={(e) => setNewRecurring((s) => ({ ...s, categoryId: e.target.value }))}><option value="">Categoría</option>{categories.filter((c) => c.kind === "both" || c.kind === newRecurring.kind).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+              <div className="grid grid-cols-2 gap-2"><input className="field" type="number" placeholder="Monto" value={newRecurring.amount} onChange={(e) => setNewRecurring((s) => ({ ...s, amount: e.target.value }))} /><input className="field" placeholder="Moneda" value={newRecurring.currency} onChange={(e) => setNewRecurring((s) => ({ ...s, currency: e.target.value }))} /></div>
+              <input className="field" placeholder="Nota" value={newRecurring.note} onChange={(e) => setNewRecurring((s) => ({ ...s, note: e.target.value }))} />
+              <button className="btn" onClick={addRecurring}>Agregar recurring</button>
+              <button className="btn" onClick={applyRecurringThisMonth}>Aplicar recurrings de este mes</button>
+              <div className="space-y-2 pt-1">
+                {recurrings.map((r) => (
+                  <div key={r.id} className="item">
+                    <div>
+                      <p className="font-medium">{r.kind === "income" ? "Ingreso" : "Consumo"} {r.amount} {r.currency}</p>
+                      <p className="text-xs text-zinc-400">Día {r.dayOfMonth} • {categoryMap[r.categoryId]?.name} • {accountMap[r.accountId]?.name}</p>
+                    </div>
+                    <span className="badge">{r.lastAppliedMonth ?? "pendiente"}</span>
+                  </div>
+                ))}
+                {!recurrings.length ? <p className="text-sm text-zinc-400">Sin recurrings aún.</p> : null}
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Metas financieras">
+            <div className="space-y-2">
+              <input className="field" placeholder="Título meta" value={newGoal.title} onChange={(e) => setNewGoal((s) => ({ ...s, title: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-2">
+                <select className="field" value={newGoal.type} onChange={(e) => setNewGoal((s) => ({ ...s, type: e.target.value as GoalType }))}>
+                  <option value="income">Meta de ingresos</option>
+                  <option value="savings">Meta de ahorro</option>
+                </select>
+                <select className="field" value={newGoal.currency} onChange={(e) => setNewGoal((s) => ({ ...s, currency: e.target.value as BaseCurrency }))}><option value="USD">USD</option><option value="UYU">UYU</option></select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input className="field" type="number" placeholder="Objetivo" value={newGoal.target} onChange={(e) => setNewGoal((s) => ({ ...s, target: e.target.value }))} />
+                <input className="field" type="date" value={newGoal.deadline} onChange={(e) => setNewGoal((s) => ({ ...s, deadline: e.target.value }))} />
+              </div>
+              <button className="btn" onClick={addGoal}>Guardar meta</button>
+              <div className="space-y-2 pt-1">
+                {goals.map((g) => {
+                  const p = goalProgress(g);
                   return (
-                    <div key={c.id} className="item block">
+                    <div key={g.id} className="item block">
                       <div className="flex items-center justify-between">
-                        <span>{c.name}</span>
-                        <span className="badge">{budget ? `${spent.toFixed(0)} / ${limitBase.toFixed(0)} ${baseCurrency}` : "sin presupuesto"}</span>
+                        <span className="font-medium">{g.title}</span>
+                        <span className="badge">{p.current.toFixed(0)} / {g.target} {g.currency}</span>
                       </div>
-                      {budget ? (
-                        <div className="mt-2 h-2 rounded bg-white/10">
-                          <div className={`h-2 rounded ${pct >= 100 ? "bg-red-500" : "bg-[#d4e83a]"}`} style={{ width: `${pct}%` }} />
-                        </div>
-                      ) : null}
+                      <p className="text-xs text-zinc-400 mt-1">{g.type === "income" ? "Ingresos" : "Ahorro"} • deadline {g.deadline}</p>
+                      <div className="mt-2 h-2 rounded bg-white/10">
+                        <div className="h-2 rounded bg-[#d4e83a]" style={{ width: `${p.pct}%` }} />
+                      </div>
                     </div>
                   );
                 })}
+                {!goals.length ? <p className="text-sm text-zinc-400">Sin metas aún.</p> : null}
               </div>
             </div>
           </Card>
