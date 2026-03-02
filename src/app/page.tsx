@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type Kind = "expense" | "income";
 type BaseCurrency = "USD" | "UYU";
@@ -116,6 +117,10 @@ export default function Home() {
   const [recurrings, setRecurrings] = useState<RecurringTx[]>([]);
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
 
+  const [cloudEmail, setCloudEmail] = useState("");
+  const [cloudUserId, setCloudUserId] = useState<string | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<string>("Cloud: no conectado");
+
   const [newCat, setNewCat] = useState({ name: "", kind: "expense" as Category["kind"] });
   const [newAccount, setNewAccount] = useState({ name: "", currency: "USD", balance: "0" });
   const [newTx, setNewTx] = useState<TxDraft>({
@@ -155,6 +160,55 @@ export default function Home() {
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [editingTx, setEditingTx] = useState<TxDraft | null>(null);
 
+  const getPayload = () => ({ categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals });
+
+  const connectCloud = async () => {
+    if (!supabase) {
+      setCloudStatus("Cloud: faltan variables NEXT_PUBLIC_SUPABASE_*");
+      return;
+    }
+    if (!cloudEmail.trim()) {
+      setCloudStatus("Cloud: ingresá tu email");
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOtp({ email: cloudEmail.trim() });
+    setCloudStatus(error ? `Cloud error: ${error.message}` : "Te envié magic link por email para conectar.");
+  };
+
+  const saveCloud = async () => {
+    if (!supabase) return setCloudStatus("Cloud: no configurado");
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id;
+    if (!userId) return setCloudStatus("Cloud: iniciá sesión primero");
+
+    const payload = getPayload();
+    const { error } = await supabase.from("lume_state").upsert({ user_id: userId, state: payload });
+    setCloudStatus(error ? `Cloud error: ${error.message}` : "Cloud: guardado ✅");
+  };
+
+  const loadCloud = async () => {
+    if (!supabase) return setCloudStatus("Cloud: no configurado");
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id;
+    if (!userId) return setCloudStatus("Cloud: iniciá sesión primero");
+
+    const { data, error } = await supabase.from("lume_state").select("state").eq("user_id", userId).maybeSingle();
+    if (error) return setCloudStatus(`Cloud error: ${error.message}`);
+    if (!data?.state) return setCloudStatus("Cloud: sin backup para este usuario");
+
+    const s = data.state as Partial<ReturnType<typeof getPayload>>;
+    if (s.categories) setCategories(s.categories as Category[]);
+    if (s.accounts) setAccounts(s.accounts as Account[]);
+    if (s.txs) setTxs(s.txs as Tx[]);
+    if (s.baseCurrency) setBaseCurrency(s.baseCurrency as BaseCurrency);
+    if (s.usdUyuRate) setUsdUyuRate(String(s.usdUyuRate));
+    if (s.budgets) setBudgets(s.budgets as Budget[]);
+    if (s.recurrings) setRecurrings(s.recurrings as RecurringTx[]);
+    if (s.goals) setGoals(s.goals as FinancialGoal[]);
+
+    setCloudStatus("Cloud: datos cargados ✅");
+  };
+
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("lume-v4");
     if (!raw) return;
@@ -171,6 +225,28 @@ export default function Home() {
     } catch {
       // noop
     }
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setCloudUserId(data.user.id);
+        setCloudStatus(`Cloud conectado: ${data.user.email ?? data.user.id}`);
+      }
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setCloudUserId(session.user.id);
+        setCloudStatus(`Cloud conectado: ${session.user.email ?? session.user.id}`);
+      } else {
+        setCloudUserId(null);
+      }
+    });
+
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -561,6 +637,25 @@ export default function Home() {
               Importar backup JSON
               <input className="hidden" type="file" accept="application/json" onChange={importBackup} />
             </label>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">Cloud sync (Supabase + login)</p>
+            <div className="mt-2 grid gap-2 md:grid-cols-4">
+              <input
+                className="field md:col-span-2"
+                placeholder="tu-email@dominio.com"
+                value={cloudEmail}
+                onChange={(e) => setCloudEmail(e.target.value)}
+              />
+              <button className="btn" onClick={connectCloud}>Conectar por magic link</button>
+              <button className="btn" onClick={saveCloud}>Guardar en cloud</button>
+            </div>
+            <div className="mt-2 grid gap-2 md:grid-cols-3">
+              <button className="btn" onClick={loadCloud}>Cargar desde cloud</button>
+              <div className="md:col-span-2 text-xs text-zinc-300 flex items-center">{cloudStatus}</div>
+            </div>
+            {cloudUserId ? <p className="mt-1 text-[11px] text-zinc-400">user_id: {cloudUserId}</p> : null}
           </div>
         </header>
 
