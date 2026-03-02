@@ -120,6 +120,7 @@ export default function Home() {
   const [cloudEmail, setCloudEmail] = useState("");
   const [cloudUserId, setCloudUserId] = useState<string | null>(null);
   const [cloudStatus, setCloudStatus] = useState<string>("Cloud: no conectado");
+  const [authChecked, setAuthChecked] = useState(false);
 
   const [newCat, setNewCat] = useState({ name: "", kind: "expense" as Category["kind"] });
   const [newAccount, setNewAccount] = useState({ name: "", currency: "USD", balance: "0" });
@@ -240,6 +241,7 @@ export default function Home() {
         setCloudUserId(data.user.id);
         setCloudStatus(`Cloud conectado: ${data.user.email ?? data.user.id}`);
       }
+      setAuthChecked(true);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -249,6 +251,7 @@ export default function Home() {
       } else {
         setCloudUserId(null);
       }
+      setAuthChecked(true);
     });
 
     return () => sub.subscription.unsubscribe();
@@ -628,6 +631,37 @@ export default function Home() {
       return inText && inCategory && inAccount && inKind && inFrom && inTo;
     });
   }, [txs, query, fCategory, fAccount, fKind, fDateFrom, fDateTo, categoryMap, accountMap]);
+
+  if (supabase && !authChecked) {
+    return (
+      <main className="min-h-screen bg-[#0b1018] text-white flex items-center justify-center p-6">
+        <div className="max-w-md w-full rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+          <h1 className="text-2xl font-bold">Lume</h1>
+          <p className="mt-2 text-zinc-300">Verificando sesión...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (supabase && !cloudUserId) {
+    return (
+      <main className="min-h-screen bg-[#0b1018] text-white flex items-center justify-center p-6">
+        <div className="max-w-lg w-full rounded-2xl border border-white/10 bg-white/5 p-6">
+          <p className="text-xs uppercase tracking-[0.24em] text-zinc-400">Lume</p>
+          <h1 className="mt-2 text-2xl font-bold">Ingresá para ver tus finanzas</h1>
+          <p className="mt-2 text-sm text-zinc-400">Por privacidad, la app queda bloqueada hasta iniciar sesión.</p>
+          <input
+            className="field mt-4"
+            placeholder="tu-email@dominio.com"
+            value={cloudEmail}
+            onChange={(e) => setCloudEmail(e.target.value)}
+          />
+          <button className="btn mt-3" onClick={connectCloud}>Enviar magic link</button>
+          <p className="mt-3 text-xs text-zinc-400">{cloudStatus}</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0b1018] text-white">
