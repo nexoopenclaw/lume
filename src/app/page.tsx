@@ -34,13 +34,29 @@ const seedCategories: Category[] = [
   { id: "c-food", name: "Comida", kind: "expense" },
   { id: "c-ads", name: "Ads", kind: "expense" },
   { id: "c-tools", name: "Herramientas", kind: "expense" },
+  { id: "c-vet", name: "Veterinaria", kind: "expense" },
   { id: "c-client", name: "Clientes", kind: "income" },
   { id: "c-aff", name: "Afiliados", kind: "income" },
 ];
 
 const seedAccounts: Account[] = [
-  { id: "a-brou", name: "BROU", currency: "UYU", balance: 0 },
-  { id: "a-itau", name: "Itaú", currency: "USD", balance: 0 },
+  { id: "a-mi-usd", name: "Mi Dinero USD", currency: "USD", balance: 1200 },
+  { id: "a-mi-uyu", name: "Mi Dinero Pesos", currency: "UYU", balance: 0 },
+  { id: "a-redots", name: "RedotPay", currency: "USDT", balance: 0 },
+  { id: "a-vinas", name: "Viñas", currency: "USD", balance: 1200 },
+];
+
+const seedTxs: Tx[] = [
+  {
+    id: "t-seed-vinas-1200",
+    accountId: "a-vinas",
+    categoryId: "c-client",
+    kind: "income",
+    amount: 1200,
+    currency: "USD",
+    note: "Consultoría cerrada hoy",
+    date: new Date().toISOString().slice(0, 10),
+  },
 ];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -48,7 +64,7 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 export default function Home() {
   const [categories, setCategories] = useState<Category[]>(seedCategories);
   const [accounts, setAccounts] = useState<Account[]>(seedAccounts);
-  const [txs, setTxs] = useState<Tx[]>([]);
+  const [txs, setTxs] = useState<Tx[]>(seedTxs);
 
   const [newCat, setNewCat] = useState({ name: "", kind: "expense" as Category["kind"] });
   const [newAccount, setNewAccount] = useState({ name: "", currency: "USD", balance: "0" });
