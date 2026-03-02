@@ -200,6 +200,13 @@ export default function Home() {
     return { income, expense, net: income - expense };
   }, [txs, baseCurrency, usdUyuRate]);
 
+  const accountBalances = useMemo(() => {
+    const usd = accounts.reduce((acc, a) => acc + toBase(a.balance, a.currency, "USD"), 0);
+    const uyu = accounts.reduce((acc, a) => acc + toBase(a.balance, a.currency, "UYU"), 0);
+    const selected = baseCurrency === "USD" ? usd : uyu;
+    return { usd, uyu, selected };
+  }, [accounts, baseCurrency, usdUyuRate]);
+
   const recurringProjection = useMemo(() => {
     const recurringIncome = recurrings
       .filter((r) => r.active && r.kind === "income")
@@ -242,8 +249,8 @@ export default function Home() {
         }, 0);
     };
 
-    const projection7 = totals.net + recurringInWindow(7);
-    const projection30 = totals.net + recurringInWindow(30);
+    const projection7 = accountBalances.selected + recurringInWindow(7);
+    const projection30 = accountBalances.selected + recurringInWindow(30);
 
     const expenseByMonth = (month: string) =>
       txs
@@ -266,7 +273,7 @@ export default function Home() {
       .slice(0, 3);
 
     return { projection7, projection30, expenseCurrent, expensePrevious, trendPct, top3, txNetUntil, sevenDaysAhead, thirtyDaysAhead };
-  }, [txs, recurrings, baseCurrency, usdUyuRate, totals.net, monthNow, monthPrev]);
+  }, [txs, recurrings, baseCurrency, usdUyuRate, accountBalances.selected, monthNow, monthPrev]);
 
   const spendByCategory = useMemo(() => {
     const map: Record<string, number> = {};
@@ -571,16 +578,22 @@ export default function Home() {
           <Kpi title={`Consumos (${baseCurrency})`} value={totals.expense} />
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <Kpi title={`Balance Neto (${baseCurrency})`} value={totals.net} highlight />
+        <section className="grid gap-4 md:grid-cols-4">
+          <Kpi title={`Balance Neto Cuentas (${baseCurrency})`} value={accountBalances.selected} highlight />
+          <Kpi title="Balance Cuentas (USD)" value={accountBalances.usd} />
+          <Kpi title="Balance Cuentas (UYU)" value={accountBalances.uyu} />
           <Kpi title="Categorías con presupuesto" value={budgets.length} />
-          <Kpi title="Recurrings activos" value={recurrings.filter((r) => r.active).length} />
         </section>
 
         <section className="mt-4 grid gap-4 md:grid-cols-3">
+          <Kpi title={`Neto de movimientos (${baseCurrency})`} value={totals.net} />
+          <Kpi title="Recurrings activos" value={recurrings.filter((r) => r.active).length} />
+          <Kpi title={`Proyección neta mensual (${baseCurrency})`} value={recurringProjection.projectedNet} highlight={recurringProjection.projectedNet >= 0} />
+        </section>
+
+        <section className="mt-4 grid gap-4 md:grid-cols-2">
           <Kpi title={`Proyección ingresos fijos (${baseCurrency})`} value={recurringProjection.recurringIncome} />
           <Kpi title={`Proyección gastos fijos (${baseCurrency})`} value={recurringProjection.recurringExpense} />
-          <Kpi title={`Proyección neta mensual (${baseCurrency})`} value={recurringProjection.projectedNet} highlight={recurringProjection.projectedNet >= 0} />
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-3">
