@@ -171,7 +171,12 @@ export default function Home() {
       setCloudStatus("Cloud: ingresá tu email");
       return;
     }
-    const { error } = await supabase.auth.signInWithOtp({ email: cloudEmail.trim() });
+    const { error } = await supabase.auth.signInWithOtp({
+      email: cloudEmail.trim(),
+      options: {
+        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+      },
+    });
     setCloudStatus(error ? `Cloud error: ${error.message}` : "Te envié magic link por email para conectar.");
   };
 
