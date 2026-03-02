@@ -107,6 +107,12 @@ const monthLabel = (value: string) => {
 
 const txImpact = (tx: Tx) => (tx.kind === "income" ? tx.amount : -tx.amount);
 
+const fmt = (n: number, digits = 2) =>
+  new Intl.NumberFormat("es-UY", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(n);
+
 export default function Home() {
   const [categories, setCategories] = useState<Category[]>(seedCategories);
   const [accounts, setAccounts] = useState<Account[]>(seedAccounts);
@@ -706,7 +712,7 @@ export default function Home() {
               </select>
               <input className="field" type="number" step="0.01" value={usdUyuRate} onChange={(e) => setUsdUyuRate(e.target.value)} placeholder="USD→UYU" />
             </div>
-            <p className="mt-2 text-xs text-zinc-400">1 USD = {rate.toFixed(2)} UYU</p>
+            <p className="mt-2 text-xs text-zinc-400">1 USD = {fmt(rate, 2)} UYU</p>
           </Card>
           <Kpi title={`Ingresos (${baseCurrency})`} value={totals.income} />
           <Kpi title={`Consumos (${baseCurrency})`} value={totals.expense} />
@@ -738,11 +744,11 @@ export default function Home() {
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <div className="rounded-lg bg-black/20 p-2">
                     <p className="text-xs text-zinc-400">7 días</p>
-                    <p className="text-lg font-semibold">{advancedDashboard.projection7.toFixed(2)} {baseCurrency}</p>
+                    <p className="text-lg font-semibold">{fmt(advancedDashboard.projection7)} {baseCurrency}</p>
                   </div>
                   <div className="rounded-lg bg-black/20 p-2">
                     <p className="text-xs text-zinc-400">30 días</p>
-                    <p className="text-lg font-semibold">{advancedDashboard.projection30.toFixed(2)} {baseCurrency}</p>
+                    <p className="text-lg font-semibold">{fmt(advancedDashboard.projection30)} {baseCurrency}</p>
                   </div>
                 </div>
               </div>
@@ -750,10 +756,10 @@ export default function Home() {
               <div className="item block">
                 <p className="text-xs text-zinc-400 uppercase tracking-[0.16em]">Tendencia de gasto</p>
                 <p className="mt-1 text-sm">
-                  Mes actual: <b>{advancedDashboard.expenseCurrent.toFixed(2)} {baseCurrency}</b> vs anterior: <b>{advancedDashboard.expensePrevious.toFixed(2)} {baseCurrency}</b>
+                  Mes actual: <b>{fmt(advancedDashboard.expenseCurrent)} {baseCurrency}</b> vs anterior: <b>{fmt(advancedDashboard.expensePrevious)} {baseCurrency}</b>
                 </p>
                 <span className={`badge mt-2 inline-block ${advancedDashboard.trendPct <= 0 ? "badge-ok" : "badge-risk"}`}>
-                  {advancedDashboard.trendPct >= 0 ? "+" : ""}{advancedDashboard.trendPct.toFixed(1)}%
+                  {advancedDashboard.trendPct >= 0 ? "+" : ""}{fmt(advancedDashboard.trendPct, 1)}%
                 </span>
               </div>
 
@@ -763,7 +769,7 @@ export default function Home() {
                   {advancedDashboard.top3.map(([categoryId, amount]) => (
                     <div className="flex items-center justify-between text-sm" key={categoryId}>
                       <span>{categoryMap[categoryId]?.name ?? "Sin categoría"}</span>
-                      <span className="text-zinc-300">{amount.toFixed(2)} {baseCurrency}</span>
+                      <span className="text-zinc-300">{fmt(amount)} {baseCurrency}</span>
                     </div>
                   ))}
                   {advancedDashboard.top3.length === 0 ? <p className="text-sm text-zinc-400">Sin gastos este mes.</p> : null}
@@ -788,7 +794,7 @@ export default function Home() {
             <div className="space-y-2">
               <div className="grid grid-cols-3 gap-2"><input className="field" placeholder="Nombre" value={newAccount.name} onChange={(e) => setNewAccount((s) => ({ ...s, name: e.target.value }))} /><input className="field" placeholder="Moneda" value={newAccount.currency} onChange={(e) => setNewAccount((s) => ({ ...s, currency: e.target.value }))} /><input className="field" placeholder="Saldo" type="number" value={newAccount.balance} onChange={(e) => setNewAccount((s) => ({ ...s, balance: e.target.value }))} /></div>
               <button className="btn" onClick={addAccount}>Agregar cuenta</button>
-              <div className="space-y-2 pt-2">{accounts.map((a) => <div key={a.id} className="item"><span>{a.name} ({a.currency})</span><span className="font-semibold">{a.balance.toFixed(2)}</span></div>)}</div>
+              <div className="space-y-2 pt-2">{accounts.map((a) => <div key={a.id} className="item"><span>{a.name} ({a.currency})</span><span className="font-semibold">{fmt(a.balance)}</span></div>)}</div>
             </div>
           </Card>
         </section>
@@ -809,7 +815,7 @@ export default function Home() {
                   const pct = budget && limitBase > 0 ? Math.min((spent / limitBase) * 100, 100) : 0;
                   return (
                     <div key={c.id} className="item block">
-                      <div className="flex items-center justify-between"><span>{c.name}</span><span className="badge">{budget ? `${spent.toFixed(0)} / ${limitBase.toFixed(0)} ${baseCurrency}` : "sin presupuesto"}</span></div>
+                      <div className="flex items-center justify-between"><span>{c.name}</span><span className="badge">{budget ? `${fmt(spent)} / ${fmt(limitBase)} ${baseCurrency}` : "sin presupuesto"}</span></div>
                       {budget ? <div className="mt-2 h-2 rounded bg-white/10"><div className={`h-2 rounded ${pct >= 100 ? "bg-red-500" : "bg-[#d4e83a]"}`} style={{ width: `${pct}%` }} /></div> : null}
                     </div>
                   );
@@ -822,7 +828,7 @@ export default function Home() {
                   {overBudgetItems.map((item) => (
                     <div key={item.categoryId} className="flex items-center justify-between text-sm">
                       <span>{categoryMap[item.categoryId]?.name}</span>
-                      <span className="text-red-300">+{item.excess.toFixed(2)} {baseCurrency}</span>
+                      <span className="text-red-300">+{fmt(item.excess)} {baseCurrency}</span>
                     </div>
                   ))}
                   {!overBudgetItems.length ? <p className="text-sm text-zinc-400">Sin alertas este mes.</p> : null}
@@ -849,7 +855,7 @@ export default function Home() {
                         <span className="font-medium">{g.title}</span>
                         <div className="flex gap-2 items-center">
                           <span className={`badge ${p.status === "on-track" ? "badge-ok" : "badge-risk"}`}>{p.status === "on-track" ? "On track" : "At risk"}</span>
-                          <span className="badge">{p.current.toFixed(0)} / {g.target} {g.currency}</span>
+                          <span className="badge">{fmt(p.current)} / {fmt(g.target)} {g.currency}</span>
                         </div>
                       </div>
                       <p className="text-xs text-zinc-400 mt-1">{g.type === "income" ? "Ingresos" : "Ahorro"} • deadline {g.deadline}</p>
@@ -902,7 +908,7 @@ export default function Home() {
                               <p className="font-medium">{categoryMap[t.categoryId]?.name ?? "Sin categoría"} • {accountMap[t.accountId]?.name ?? "Sin cuenta"}</p>
                               <p className="text-xs text-zinc-400">{t.date} {t.note ? `• ${t.note}` : ""}</p>
                             </div>
-                            <span className={t.kind === "income" ? "text-green-400" : "text-red-400"}>{t.kind === "income" ? "+" : "-"}{t.amount.toFixed(2)} {t.currency}</span>
+                            <span className={t.kind === "income" ? "text-green-400" : "text-red-400"}>{t.kind === "income" ? "+" : "-"}{fmt(t.amount)} {t.currency}</span>
                           </div>
                           <div className="mt-2 flex gap-2">
                             <button className="btn btn-small" onClick={() => startEditTx(t)}>Editar</button>
@@ -948,7 +954,7 @@ function Kpi({ title, value, highlight = false }: { title: string; value: number
   return (
     <div className={`rounded-2xl border p-4 ${highlight ? "border-[#d4e83a]/45 bg-[#d4e83a]/10" : "border-white/10 bg-white/5"}`}>
       <p className={`text-xs uppercase tracking-[0.2em] ${highlight ? "text-[#d4e83a]" : "text-zinc-400"}`}>{title}</p>
-      <p className="mt-2 text-3xl font-bold">{value.toFixed(2)}</p>
+      <p className="mt-2 text-3xl font-bold">{fmt(value)}</p>
     </div>
   );
 }
