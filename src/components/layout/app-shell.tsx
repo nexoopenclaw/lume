@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const {
     cloudEmail, setCloudEmail, cloudPassword, setCloudPassword,
     cloudCode, setCloudCode, cloudStatus,
-    signUpWithPassword, signInWithPassword, sendCloudCode, verifyCloudCode,
+    signUpWithPassword, signInWithPassword, resetCloudPassword, sendCloudCode, verifyCloudCode,
     authChecked, cloudUserId,
   } = useFinanceStore();
 
@@ -37,6 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button className="btn" onClick={signInWithPassword}>Iniciar sesión</button>
             <button className="btn" onClick={signUpWithPassword}>Crear cuenta</button>
           </div>
+          <button className="btn mt-2" onClick={resetCloudPassword}>Recuperar / crear contraseña</button>
           <p className="mt-3 text-xs text-zinc-400">Si preferís, también podés entrar con código por email:</p>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
             <button className="btn" onClick={sendCloudCode}>Enviar código</button>

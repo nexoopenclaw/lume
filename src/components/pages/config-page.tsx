@@ -54,6 +54,7 @@ export function ConfigPage() {
           <button className="btn" onClick={s.saveCloud}>Guardar en cloud</button>
           <button className="btn" onClick={s.loadCloud}>Cargar desde cloud</button>
         </div>
+        <button className="btn" onClick={s.resetCloudPassword}>Recuperar / crear contraseña</button>
 
         <p className="text-xs text-zinc-400">Fallback: login por código</p>
         <div className="grid md:grid-cols-3 gap-2">

@@ -284,6 +284,15 @@ function useFinanceStoreInternal() {
     setCloudStatus(error ? `Cloud error: ${error.message}` : "Cloud: sesión iniciada ✅");
   };
 
+  const resetCloudPassword = async () => {
+    if (!supabase) return setCloudStatus("Cloud: faltan variables NEXT_PUBLIC_SUPABASE_*");
+    if (!cloudEmail.trim()) return setCloudStatus("Cloud: ingresá tu email");
+    const { error } = await supabase.auth.resetPasswordForEmail(cloudEmail.trim(), {
+      redirectTo: typeof window !== "undefined" ? `${window.location.origin}/config` : undefined,
+    });
+    setCloudStatus(error ? `Cloud error: ${error.message}` : "Te envié email para recuperar/crear contraseña.");
+  };
+
   const sendCloudCode = async () => {
     if (!supabase) return setCloudStatus("Cloud: faltan variables NEXT_PUBLIC_SUPABASE_*");
     if (!cloudEmail.trim()) return setCloudStatus("Cloud: ingresá tu email");
@@ -348,7 +357,7 @@ function useFinanceStoreInternal() {
     categories, accounts, txs, budgets, recurrings, goals, reconciliations,
     baseCurrency, setBaseCurrency, usdUyuRate, setUsdUyuRate,
     cloudEmail, setCloudEmail, cloudPassword, setCloudPassword, cloudCode, setCloudCode, cloudUserId, cloudStatus, authChecked,
-    connectCloud: sendCloudCode, signUpWithPassword, signInWithPassword, sendCloudCode, verifyCloudCode, signOutCloud, saveCloud, loadCloud,
+    connectCloud: sendCloudCode, signUpWithPassword, signInWithPassword, resetCloudPassword, sendCloudCode, verifyCloudCode, signOutCloud, saveCloud, loadCloud,
     accountMap, categoryMap, totals, accountBalances, spendByCategory, overBudgetItems, smartAlerts, filteredTxs,
     query, setQuery, fCategory, setFCategory, fAccount, setFAccount, fKind, setFKind, fDateFrom, setFDateFrom, fDateTo, setFDateTo,
     toBase,
