@@ -39,6 +39,24 @@ export function ConfigPage() {
             value={s.cloudEmail}
             onChange={(e) => s.setCloudEmail(e.target.value)}
           />
+          <input
+            className="field"
+            type="password"
+            placeholder="Contraseña"
+            value={s.cloudPassword}
+            onChange={(e) => s.setCloudPassword(e.target.value)}
+          />
+          <button className="btn" onClick={s.signInWithPassword}>Iniciar sesión</button>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-2">
+          <button className="btn" onClick={s.signUpWithPassword}>Crear cuenta (con verificación)</button>
+          <button className="btn" onClick={s.saveCloud}>Guardar en cloud</button>
+          <button className="btn" onClick={s.loadCloud}>Cargar desde cloud</button>
+        </div>
+
+        <p className="text-xs text-zinc-400">Fallback: login por código</p>
+        <div className="grid md:grid-cols-3 gap-2">
           <button className="btn" onClick={s.sendCloudCode}>Enviar código</button>
           <input
             className="field"
@@ -46,12 +64,7 @@ export function ConfigPage() {
             value={s.cloudCode}
             onChange={(e) => s.setCloudCode(e.target.value)}
           />
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-2">
-          <button className="btn" onClick={s.verifyCloudCode}>Verificar e ingresar</button>
-          <button className="btn" onClick={s.saveCloud}>Guardar en cloud</button>
-          <button className="btn" onClick={s.loadCloud}>Cargar desde cloud</button>
+          <button className="btn" onClick={s.verifyCloudCode}>Verificar código</button>
         </div>
 
         {s.cloudUserId ? <button className="btn" onClick={s.signOutCloud}>Cerrar sesión</button> : null}

@@ -128,6 +128,7 @@ function useFinanceStoreInternal() {
   const [reconciliations, setReconciliations] = useState<Record<string, ReconciliationState>>({});
 
   const [cloudEmail, setCloudEmail] = useState("");
+  const [cloudPassword, setCloudPassword] = useState("");
   const [cloudCode, setCloudCode] = useState("");
   const [cloudUserId, setCloudUserId] = useState<string | null>(null);
   const [cloudStatus, setCloudStatus] = useState<string>("Cloud: no conectado");
@@ -263,6 +264,26 @@ function useFinanceStoreInternal() {
     });
   }, [txs, query, fCategory, fAccount, fKind, fDateFrom, fDateTo, categoryMap, accountMap]);
 
+  const signUpWithPassword = async () => {
+    if (!supabase) return setCloudStatus("Cloud: faltan variables NEXT_PUBLIC_SUPABASE_*");
+    if (!cloudEmail.trim()) return setCloudStatus("Cloud: ingresá tu email");
+    if (!cloudPassword || cloudPassword.length < 6) return setCloudStatus("Cloud: la contraseña debe tener al menos 6 caracteres");
+    const { error } = await supabase.auth.signUp({
+      email: cloudEmail.trim(),
+      password: cloudPassword,
+      options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+    });
+    setCloudStatus(error ? `Cloud error: ${error.message}` : "Cuenta creada. Verificá tu email y luego iniciá sesión.");
+  };
+
+  const signInWithPassword = async () => {
+    if (!supabase) return setCloudStatus("Cloud: faltan variables NEXT_PUBLIC_SUPABASE_*");
+    if (!cloudEmail.trim()) return setCloudStatus("Cloud: ingresá tu email");
+    if (!cloudPassword) return setCloudStatus("Cloud: ingresá tu contraseña");
+    const { error } = await supabase.auth.signInWithPassword({ email: cloudEmail.trim(), password: cloudPassword });
+    setCloudStatus(error ? `Cloud error: ${error.message}` : "Cloud: sesión iniciada ✅");
+  };
+
   const sendCloudCode = async () => {
     if (!supabase) return setCloudStatus("Cloud: faltan variables NEXT_PUBLIC_SUPABASE_*");
     if (!cloudEmail.trim()) return setCloudStatus("Cloud: ingresá tu email");
@@ -326,8 +347,8 @@ function useFinanceStoreInternal() {
   return {
     categories, accounts, txs, budgets, recurrings, goals, reconciliations,
     baseCurrency, setBaseCurrency, usdUyuRate, setUsdUyuRate,
-    cloudEmail, setCloudEmail, cloudCode, setCloudCode, cloudUserId, cloudStatus, authChecked,
-    connectCloud: sendCloudCode, sendCloudCode, verifyCloudCode, signOutCloud, saveCloud, loadCloud,
+    cloudEmail, setCloudEmail, cloudPassword, setCloudPassword, cloudCode, setCloudCode, cloudUserId, cloudStatus, authChecked,
+    connectCloud: sendCloudCode, signUpWithPassword, signInWithPassword, sendCloudCode, verifyCloudCode, signOutCloud, saveCloud, loadCloud,
     accountMap, categoryMap, totals, accountBalances, spendByCategory, overBudgetItems, smartAlerts, filteredTxs,
     query, setQuery, fCategory, setFCategory, fAccount, setFAccount, fKind, setFKind, fDateFrom, setFDateFrom, fDateTo, setFDateTo,
     toBase,

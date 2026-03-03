@@ -17,7 +17,12 @@ const nav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { cloudEmail, setCloudEmail, cloudCode, setCloudCode, cloudStatus, sendCloudCode, verifyCloudCode, authChecked, cloudUserId } = useFinanceStore();
+  const {
+    cloudEmail, setCloudEmail, cloudPassword, setCloudPassword,
+    cloudCode, setCloudCode, cloudStatus,
+    signUpWithPassword, signInWithPassword, sendCloudCode, verifyCloudCode,
+    authChecked, cloudUserId,
+  } = useFinanceStore();
 
   if (authChecked && !cloudUserId) {
     return (
@@ -27,11 +32,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <h1 className="mt-2 text-2xl font-bold">Ingresá para ver tus finanzas</h1>
           <p className="mt-2 text-sm text-zinc-400">Por privacidad, la app queda bloqueada hasta iniciar sesión.</p>
           <input className="field mt-4" placeholder="tu-email@dominio.com" value={cloudEmail} onChange={(e) => setCloudEmail(e.target.value)} />
+          <input className="field mt-2" type="password" placeholder="Contraseña" value={cloudPassword} onChange={(e) => setCloudPassword(e.target.value)} />
           <div className="mt-3 grid gap-2 md:grid-cols-2">
+            <button className="btn" onClick={signInWithPassword}>Iniciar sesión</button>
+            <button className="btn" onClick={signUpWithPassword}>Crear cuenta</button>
+          </div>
+          <p className="mt-3 text-xs text-zinc-400">Si preferís, también podés entrar con código por email:</p>
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
             <button className="btn" onClick={sendCloudCode}>Enviar código</button>
             <input className="field" placeholder="Código de 6 dígitos" value={cloudCode} onChange={(e) => setCloudCode(e.target.value)} />
           </div>
-          <button className="btn mt-3" onClick={verifyCloudCode}>Verificar código e ingresar</button>
+          <button className="btn mt-2" onClick={verifyCloudCode}>Verificar código</button>
           <p className="mt-3 text-xs text-zinc-400">{cloudStatus}</p>
         </div>
       </main>
