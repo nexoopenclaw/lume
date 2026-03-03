@@ -83,6 +83,7 @@ const seedAccounts: Account[] = [
   { id: "a-mi-uyu", name: "Mi Dinero Pesos", currency: "UYU", balance: 0 },
   { id: "a-redots", name: "RedotPay", currency: "USDT", balance: 0 },
   { id: "a-binance", name: "Binance", currency: "USDT", balance: 905.5 },
+  { id: "a-skool", name: "Skool", currency: "USD", balance: 4055 },
 ];
 
 const seedTxs: Tx[] = [
@@ -254,6 +255,11 @@ export default function Home() {
       // noop
     }
   }, []);
+
+  useEffect(() => {
+    if (accounts.some((a) => a.id === "a-skool")) return;
+    setAccounts((prev) => (prev.some((a) => a.id === "a-skool") ? prev : [...prev, { id: "a-skool", name: "Skool", currency: "USD", balance: 4055 }]));
+  }, [accounts]);
 
   useEffect(() => {
     if (!supabase) return;
