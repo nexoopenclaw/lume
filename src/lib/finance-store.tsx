@@ -128,6 +128,7 @@ function useFinanceStoreInternal() {
   const [reconciliations, setReconciliations] = useState<Record<string, ReconciliationState>>({});
 
   const [cloudEmail, setCloudEmail] = useState("");
+  const [cloudCode, setCloudCode] = useState("");
   const [cloudUserId, setCloudUserId] = useState<string | null>(null);
   const [cloudStatus, setCloudStatus] = useState<string>("Cloud: no conectado");
   const [authChecked, setAuthChecked] = useState(false);
@@ -262,14 +263,34 @@ function useFinanceStoreInternal() {
     });
   }, [txs, query, fCategory, fAccount, fKind, fDateFrom, fDateTo, categoryMap, accountMap]);
 
-  const connectCloud = async () => {
+  const sendCloudCode = async () => {
     if (!supabase) return setCloudStatus("Cloud: faltan variables NEXT_PUBLIC_SUPABASE_*");
     if (!cloudEmail.trim()) return setCloudStatus("Cloud: ingresá tu email");
     const { error } = await supabase.auth.signInWithOtp({
       email: cloudEmail.trim(),
-      options: { emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+      },
     });
-    setCloudStatus(error ? `Cloud error: ${error.message}` : "Te envié magic link por email para conectar.");
+    setCloudStatus(error ? `Cloud error: ${error.message}` : "Te envié un código por email. Pegalo acá para entrar en este navegador.");
+  };
+
+  const verifyCloudCode = async () => {
+    if (!supabase) return setCloudStatus("Cloud: faltan variables NEXT_PUBLIC_SUPABASE_*");
+    if (!cloudEmail.trim()) return setCloudStatus("Cloud: ingresá tu email");
+    const token = cloudCode.trim();
+    if (!token) return setCloudStatus("Cloud: ingresá el código de verificación");
+    const { error } = await supabase.auth.verifyOtp({ email: cloudEmail.trim(), token, type: "email" });
+    setCloudStatus(error ? `Cloud error: ${error.message}` : "Cloud: sesión iniciada ✅");
+  };
+
+  const signOutCloud = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setCloudUserId(null);
+    setCloudCode("");
+    setCloudStatus("Cloud: sesión cerrada");
   };
 
   const getPayload = () => ({ categories, accounts, txs, baseCurrency, usdUyuRate, budgets, recurrings, goals, reconciliations });
@@ -305,7 +326,8 @@ function useFinanceStoreInternal() {
   return {
     categories, accounts, txs, budgets, recurrings, goals, reconciliations,
     baseCurrency, setBaseCurrency, usdUyuRate, setUsdUyuRate,
-    cloudEmail, setCloudEmail, cloudUserId, cloudStatus, authChecked, connectCloud, saveCloud, loadCloud,
+    cloudEmail, setCloudEmail, cloudCode, setCloudCode, cloudUserId, cloudStatus, authChecked,
+    connectCloud: sendCloudCode, sendCloudCode, verifyCloudCode, signOutCloud, saveCloud, loadCloud,
     accountMap, categoryMap, totals, accountBalances, spendByCategory, overBudgetItems, smartAlerts, filteredTxs,
     query, setQuery, fCategory, setFCategory, fAccount, setFAccount, fKind, setFKind, fDateFrom, setFDateFrom, fDateTo, setFDateTo,
     toBase,

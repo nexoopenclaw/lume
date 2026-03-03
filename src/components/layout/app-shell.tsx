@@ -17,7 +17,7 @@ const nav = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { cloudEmail, setCloudEmail, cloudStatus, connectCloud, authChecked, cloudUserId } = useFinanceStore();
+  const { cloudEmail, setCloudEmail, cloudCode, setCloudCode, cloudStatus, sendCloudCode, verifyCloudCode, authChecked, cloudUserId } = useFinanceStore();
 
   if (authChecked && !cloudUserId) {
     return (
@@ -27,7 +27,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <h1 className="mt-2 text-2xl font-bold">Ingresá para ver tus finanzas</h1>
           <p className="mt-2 text-sm text-zinc-400">Por privacidad, la app queda bloqueada hasta iniciar sesión.</p>
           <input className="field mt-4" placeholder="tu-email@dominio.com" value={cloudEmail} onChange={(e) => setCloudEmail(e.target.value)} />
-          <button className="btn mt-3" onClick={connectCloud}>Enviar magic link</button>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            <button className="btn" onClick={sendCloudCode}>Enviar código</button>
+            <input className="field" placeholder="Código de 6 dígitos" value={cloudCode} onChange={(e) => setCloudCode(e.target.value)} />
+          </div>
+          <button className="btn mt-3" onClick={verifyCloudCode}>Verificar código e ingresar</button>
           <p className="mt-3 text-xs text-zinc-400">{cloudStatus}</p>
         </div>
       </main>
